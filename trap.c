@@ -8,6 +8,9 @@
 #include "traps.h"
 #include "spinlock.h"
 
+int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
+extern int page_allocator_type;
+
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
@@ -48,10 +51,36 @@ trap(struct trapframe *tf)
  // CS 3320 project 2
  // You might need to change the folloiwng default page fault handling
  // for your project 2
- if(tf->trapno == T_PGFLT){                 // CS 3320 project 2
-    uint faulting_va;                       // CS 3320 project 2
-    faulting_va = rcr2();                   // CS 3320 project 2
-    cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);     // CS 3320 project 2
+ if(tf->trapno == T_PGFLT){
+    uint faulting_va;
+    faulting_va = rcr2();
+    
+    if(page_allocator_type == 1) {
+      uint rounded_va = PGROUNDDOWN(faulting_va);
+      
+      if(faulting_va >= PGSIZE && faulting_va < proc->sz) {
+        char *mem = kalloc();
+        if(mem == 0) {
+          cprintf("Out of memory during lazy allocation!\n");
+          proc->killed = 1;
+        } else {
+          memset(mem, 0, PGSIZE);
+          if(mappages(proc->pgdir, (char*)rounded_va, PGSIZE, v2p(mem), PTE_W|PTE_U) < 0) {
+            cprintf("mappages failed during lazy allocation!\n");
+            kfree(mem);
+            proc->killed = 1;
+          } else {
+            if(proc->killed)
+              exit();
+            return;
+          }
+        }
+      } else {
+        cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);
+      }
+    } else {
+      cprintf("Unhandled page fault for va:0x%x!\n", faulting_va);
+    }
  }
 
 

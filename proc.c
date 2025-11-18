@@ -113,15 +113,21 @@ growproc(int n)
   
   sz = proc->sz;
   if(n > 0){
-    if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
-    {
-      cprintf("Allocating pages failed!\n"); // CS3320: project 2
-      return -1;
+    if(page_allocator_type == 1) {
+      if(sz + n >= KERNBASE) {
+        cprintf("Allocating pages failed!\n");
+        return -1;
+      }
+      sz = sz + n;
+    } else {
+      if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0) {
+        cprintf("Allocating pages failed!\n");
+        return -1;
+      }
     }
   } else if(n < 0){
-    if((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0)
-    {
-      cprintf("Deallocating pages failed!\n"); // CS3320: project 2
+    if((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0) {
+      cprintf("Deallocating pages failed!\n");
       return -1;
     }
   }
